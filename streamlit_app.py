@@ -9,15 +9,11 @@ import random
 import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
-
+import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-from xgboost import XGBRegressor
-
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import SimpleRNN, Dense, Dropout, Conv1D, Flatten
+from tensorflow.keras.models import load_model
 
 # ============================================================
 # PAGE CONFIG
@@ -180,31 +176,28 @@ def get_scaler(X_train):
 scaler, X_train_scaled, X_test_scaled = get_scaler(X_train)
 
 # ============================================================
-# MACHINE LEARNING MODELS
+# LOAD MACHINE LEARNING MODELS
 # ============================================================
 
 @st.cache_resource
-def train_ml_models():
+def load_ml_models():
 
-    xgb = XGBRegressor(n_estimators=200,max_depth=5)
-    rf = RandomForestRegressor(n_estimators=100,max_depth=4)
-
-    xgb.fit(X_train_scaled,y_train)
-    rf.fit(X_train_scaled,y_train)
+    xgb = joblib.load("xgb_model.pkl")
+    rf = joblib.load("rf_model.pkl")
 
     xgb_pred = xgb.predict(X_test_scaled)
     rf_pred = rf.predict(X_test_scaled)
 
     return xgb, rf, xgb_pred, rf_pred
 
-xgb, rf, xgb_pred, rf_pred = train_ml_models()
+xgb, rf, xgb_pred, rf_pred = load_ml_models()
 
 # ============================================================
-# DEEP LEARNING MODELS
+# LOAD DEEP LEARNING MODELS
 # ============================================================
 
 @st.cache_resource
-def train_dl_models():
+def load_dl_models():
 
     def create_sequences(X,y,steps=3):
 
@@ -212,7 +205,6 @@ def train_dl_models():
         ys=[]
 
         for i in range(len(X)-steps):
-
             Xs.append(X.iloc[i:i+steps].values)
             ys.append(y.iloc[i+steps])
 
@@ -225,35 +217,17 @@ def train_dl_models():
     X_train_s,X_test_s = X_seq[:split],X_seq[split:]
     y_train_s,y_test_s = y_seq[:split],y_seq[split:]
 
-    time_steps = 3
-    test_dates_seq = df_model['Date'].iloc[split + time_steps:].reset_index(drop=True)
+    test_dates_seq = df_model['Date'].iloc[split + 3:].reset_index(drop=True)
 
-    rnn_model = Sequential([
-    SimpleRNN(18,input_shape=(3,8)),
-    Dropout(0.3),
-    Dense(1)
-    ])
-
-    rnn_model.compile(optimizer='adam',loss='mse')
-    rnn_model.fit(X_train_s,y_train_s,epochs=5,verbose=0)
+    rnn_model = load_model("rnn_model.keras")
+    cnn_model = load_model("cnn_model.keras")
 
     rnn_pred = rnn_model.predict(X_test_s).flatten()
-
-    cnn_model = Sequential([
-    Conv1D(8,kernel_size=2,activation='relu',input_shape=(3,8)),
-    Dropout(0.3),
-    Flatten(),
-    Dense(1)
-    ])
-
-    cnn_model.compile(optimizer='adam',loss='mse')
-    cnn_model.fit(X_train_s,y_train_s,epochs=4,verbose=0)
-
     cnn_pred = cnn_model.predict(X_test_s).flatten()
 
     return rnn_pred, cnn_pred, y_test_s, test_dates_seq
 
-rnn_pred, cnn_pred, y_test_s, test_dates_seq = train_dl_models()
+rnn_pred, cnn_pred, y_test_s, test_dates_seq = load_dl_models()
 
 # ============================================================
 # HYBRID MODEL
