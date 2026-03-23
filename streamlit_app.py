@@ -6,15 +6,25 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import random
-import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
 import joblib
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge
-from tensorflow.keras.models import load_model
 
+# ============================================================
+# SAFE TENSORFLOW IMPORT (IMPORTANT)
+# ============================================================
+
+try:
+    import tensorflow as tf
+    from tensorflow.keras.models import load_model
+    TF_AVAILABLE = True
+except:
+    TF_AVAILABLE = False
+    
 # ============================================================
 # PAGE CONFIG
 # ============================================================
@@ -37,7 +47,8 @@ page = st.sidebar.selectbox(
 SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
-tf.random.set_seed(SEED)
+if TF_AVAILABLE:
+    tf.random.set_seed(SEED)
 
 # ============================================================
 # LOAD DATA
@@ -164,16 +175,13 @@ y_test = y[test_mask]
 # ============================================================
 
 @st.cache_resource
-def get_scaler(X_train):
-
+def get_scaler():
     scaler = StandardScaler()
-
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-
     return scaler, X_train_scaled, X_test_scaled
 
-scaler, X_train_scaled, X_test_scaled = get_scaler(X_train)
+scaler, X_train_scaled, X_test_scaled = get_scaler()
 
 # ============================================================
 # LOAD MACHINE LEARNING MODELS
@@ -195,20 +203,14 @@ xgb, rf, xgb_pred, rf_pred = load_ml_models()
 # ============================================================
 # LOAD DEEP LEARNING MODELS
 # ============================================================
-
-@st.cache_resource
 def load_dl_models():
 
     def create_sequences(X,y,steps=3):
-
-        Xs=[]
-        ys=[]
-
+        Xs, ys = [], []
         for i in range(len(X)-steps):
             Xs.append(X.iloc[i:i+steps].values)
             ys.append(y.iloc[i+steps])
-
-        return np.array(Xs),np.array(ys)
+        return np.array(Xs), np.array(ys)
 
     X_seq,y_seq = create_sequences(X,y,3)
 
@@ -227,7 +229,11 @@ def load_dl_models():
 
     return rnn_pred, cnn_pred, y_test_s, test_dates_seq
 
-rnn_pred, cnn_pred, y_test_s, test_dates_seq = load_dl_models()
+# Safe execution
+if TF_AVAILABLE:
+    rnn_pred, cnn_pred, y_test_s, test_dates_seq = load_dl_models()
+else:
+    rnn_pred, cnn_pred, y_test_s, test_dates_seq = [], [], [], []
 
 # ============================================================
 # HYBRID MODEL
