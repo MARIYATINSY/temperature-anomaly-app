@@ -5,6 +5,5 @@ matplotlib
 seaborn
 scikit-learn
 xgboost
-tensorflow
 joblib
 openpyxl
